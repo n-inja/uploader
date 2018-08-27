@@ -9,6 +9,8 @@ import (
 
 	"io"
 
+	"fmt"
+
 	"./utils"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/xid"
@@ -24,7 +26,6 @@ func main() {
 		log.Fatal(err.Error())
 		return
 	}
-	defer utils.Close()
 
 	router := gin.Default()
 	router.GET("go-uploader/api/v1/files", getFileList)
@@ -76,8 +77,10 @@ func postFile(c *gin.Context) {
 			return
 		}
 		filename := header.Filename
-		path := os.Getenv("UPLOAD_FILE_PATH") + "/" + xid.New().String()
-		out, err := os.Create(path)
+
+		path := xid.New().String()
+
+		out, err := os.Create(os.Getenv("UPLOAD_FILE_PATH") + "/" + path)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{})
 			return
@@ -96,6 +99,7 @@ func postFile(c *gin.Context) {
 		f.Auth = auth
 		err = utils.InsertFileInfo(f)
 		if err != nil {
+			fmt.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{})
 			return
 		}

@@ -5,6 +5,8 @@ import (
 
 	"errors"
 
+	"fmt"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -18,6 +20,7 @@ type File struct {
 }
 
 func Open(userName, password, address, databaseName string) error {
+	fmt.Println(userName + ":" + password + "@" + address + "/" + databaseName)
 	var err error
 	db, err = sql.Open("mysql", userName+":"+password+"@"+address+"/"+databaseName)
 	if err != nil {
@@ -35,14 +38,14 @@ func initDB() error {
 	if err != nil {
 		return nil
 	}
+	defer db.Close()
 	if !rows.Next() {
-		rows.Close()
 		_, err = db.Exec("create table 'files' (name varchar(256) NOT NULL PRIMARY KEY, path varchar(20) NOT NULL, user_id varchar(32) NOT NULL, auth varchar(10) NOT NULL, index(user_id))")
 		if err != nil {
 			return err
 		}
 	}
-	rows.Close()
+
 	return nil
 }
 
@@ -55,7 +58,12 @@ func GetFileList(ID string) []File {
 	rows.Next()
 	rows.Scan(&count)
 	rows.Close()
-	var ret [count]File
+
+	if count > 1000 {
+		count = 1000
+	}
+
+	var ret [1000]File
 
 	rows, err = db.Query("select name, path, user_id, auth from files where auth = 'public' OR auth = 'internal' OR auth = 'private' AND user_id = ?", ID)
 	if err != nil {
@@ -70,7 +78,7 @@ func GetFileList(ID string) []File {
 		rows.Scan(&ret[i].Auth)
 	}
 
-	return ret[:]
+	return ret[0:count]
 }
 
 func GetFileByName(ID, name string) (File, error) {

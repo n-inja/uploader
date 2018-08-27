@@ -11,6 +11,9 @@ import (
 
 	"fmt"
 
+	"io/ioutil"
+	"path/filepath"
+
 	"./utils"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/xid"
@@ -31,9 +34,9 @@ func main() {
 	router.GET("go-uploader/api/v1/files", getFileList)
 	router.GET("go-uploader/api/v1/files/:filename", getFileInfo)
 	router.POST("go-uploader/api/v1/files", postFile)
-	router.DELETE("go-uploader/api/v1/files/:filename")
-	router.PUT("go-uploader/api/v1/files/:filename")
-	router.GET("static/:filename")
+	router.DELETE("go-uploader/api/v1/files/:filename", deleteFile)
+	router.PUT("go-uploader/api/v1/files/:filename", renameFile)
+	router.GET("static/:filename", broadcastFile)
 
 	router.Run(":" + os.Getenv("UPLOADER_PORT"))
 }
@@ -80,7 +83,7 @@ func postFile(c *gin.Context) {
 
 		path := xid.New().String()
 
-		out, err := os.Create(os.Getenv("UPLOAD_FILE_PATH") + "/" + path)
+		out, err := os.Create(filepath.Join(os.Getenv("UPLOAD_FILE_PATH"), path))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{})
 			return
@@ -109,4 +112,70 @@ func postFile(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusUnauthorized, gin.H{})
 	}
+}
+
+func deleteFile(c *gin.Context) {
+	ID := c.GetHeader("id")
+	if ID != "" {
+		err := utils.DeleteFile(ID, c.Param("filename"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{})
+		} else {
+			c.JSON(http.StatusOK, gin.H{})
+		}
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{})
+	}
+}
+
+type RenamePost struct {
+	NewName string `json:"newName" form:"newName" binding:"required"`
+}
+
+func renameFile(c *gin.Context) {
+	ID := c.GetHeader("id")
+
+	if ID != "" {
+		var json RenamePost
+		if c.BindJSON(&json) != nil {
+			c.JSON(http.StatusBadRequest, gin.H{})
+			return
+		}
+
+		err := utils.RenameFile(ID, c.Param("filename"), json.NewName)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{})
+		} else {
+			c.JSON(http.StatusOK, gin.H{})
+		}
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{})
+	}
+}
+
+func broadcastFile(c *gin.Context) {
+	ID := c.GetHeader("id")
+	filename := c.Param("filename")
+	var path string
+	var err error
+
+	if ID != "" {
+		path, err = utils.GetFilePath(ID, filename)
+	} else {
+		path, err = utils.GetPublicFilePath(filename)
+	}
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{})
+		return
+	}
+
+	bytes, err := ioutil.ReadFile(filepath.Join(os.Getenv("UPLOAD_FILE_PATH"), path))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+
+	mimeType := http.DetectContentType(bytes)
+
+	c.Data(http.StatusOK, mimeType, bytes)
 }

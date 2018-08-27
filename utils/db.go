@@ -88,10 +88,7 @@ func GetFileByName(ID, name string) (File, error) {
 		rows.Close()
 		return ret, errors.New("not found")
 	}
-	rows.Scan(&ret.Name)
-	rows.Scan(&ret.Path)
-	rows.Scan(&ret.UserID)
-	rows.Scan(&ret.Auth)
+	rows.Scan(&ret.Name, &ret.Path, &ret.UserID, &ret.Auth)
 	defer rows.Close()
 	return ret, nil
 }
@@ -102,4 +99,60 @@ func InsertFileInfo(file File) error {
 		return err
 	}
 	return nil
+}
+
+func DeleteFile(ID, filename string) error {
+	if ID == "root" {
+		_, err := db.Exec("delete from files where name = ?", filename)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err := db.Exec("delete from files where name = ? and user_id = ?", filename, ID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func RenameFile(ID, filename, newFilename string) error {
+	if ID == "root" {
+		_, err := db.Exec("update files set name = ? where name = ? and (auth != 'private' or user_id = 'root')", newFilename, filename)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err := db.Exec("update files set name = ? where name = ? and user_id = ?", newFilename, filename, ID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func GetFilePath(ID, filename string) (string, error) {
+	rows, err := db.Query("select path from files where name = ? and (auth = 'public' or auth = 'internal' or auth = 'private' and user_id = ?)", filename, ID)
+	if err != nil {
+		return "", err
+	}
+	if !rows.Next() {
+		return "", errors.New("file not found")
+	}
+	var path string
+	rows.Scan(&path)
+	return path, nil
+}
+
+func GetPublicFilePath(filename string) (string, error) {
+	rows, err := db.Query("select path from files where name = ? and auth = 'public'", filename)
+	if err != nil {
+		return "", err
+	}
+	if !rows.Next() {
+		return "", errors.New("file not found")
+	}
+	var path string
+	rows.Scan(&path)
+	return path, nil
 }

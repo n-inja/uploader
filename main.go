@@ -68,8 +68,8 @@ func getFileInfo(c *gin.Context) {
 func postFile(c *gin.Context) {
 	ID := c.GetHeader("id")
 	if ID != "" {
-		auth := c.PostForm("auth")
-		if auth != "public" && auth != "internal" && auth != "private" {
+		accessLevel := c.PostForm("accessLevel")
+		if accessLevel != "public" && accessLevel != "internal" && accessLevel != "private" {
 			c.JSON(http.StatusBadRequest, gin.H{})
 			return
 		}
@@ -99,7 +99,7 @@ func postFile(c *gin.Context) {
 		f.UserID = ID
 		f.Name = filename
 		f.Path = path
-		f.Auth = auth
+		f.AccessLevel = accessLevel
 		err = utils.InsertFileInfo(f)
 		if err != nil {
 			fmt.Println(err)
@@ -129,7 +129,8 @@ func deleteFile(c *gin.Context) {
 }
 
 type RenamePost struct {
-	NewName string `json:"newName" form:"newName" binding:"required"`
+	NewName        string `json:"newName" form:"newName"`
+	NewAccessLevel string `json:"newAccessLevel" form:"newAccessLevel"`
 }
 
 func renameFile(c *gin.Context) {
@@ -141,8 +142,12 @@ func renameFile(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{})
 			return
 		}
+		if json.NewAccessLevel != "" && json.NewAccessLevel != "public" && json.NewAccessLevel != "internal" && json.NewAccessLevel != "private" {
+			c.JSON(http.StatusBadRequest, gin.H{})
+			return
+		}
 
-		err := utils.RenameFile(ID, c.Param("filename"), json.NewName)
+		err := utils.RenameFile(ID, c.Param("filename"), json.NewName, json.NewAccessLevel)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{})
 		} else {

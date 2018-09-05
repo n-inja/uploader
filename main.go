@@ -83,6 +83,10 @@ func postFile(c *gin.Context) {
 
 		path := xid.New().String()
 
+		if c.PostForm("name") != "" {
+			filename = c.PostForm("name")
+		}
+
 		out, err := os.Create(filepath.Join(os.Getenv("UPLOAD_FILE_PATH"), path))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{})

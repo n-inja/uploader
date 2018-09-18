@@ -23,6 +23,7 @@ func Open(userName, password, address, databaseName string) error {
 	if err != nil {
 		return err
 	}
+	db.SetMaxIdleConns(0)
 	return initDB()
 }
 
